@@ -10,12 +10,10 @@ struct Round {
     mapping (address => bytes32) hashes; // shranjuje dodan hash posameznega naslova
     mapping (address => bool) hashCommiters; // shranjuje true za naslov, ki je ze dal hash
 
-    mapping (address => bool) doesMatch; // shranjuje true za naslov, kateremu se ujemata hash in glas
-    mapping (address => bool) doesnotMatch; // shranjuje vrednosti glasov, ki se ne ujemajo
-    mapping (address => uint256) correctVotes; // shranjuje vrednosti glasov, ki se ujemajo 
-
     mapping (address => uint256) votes; // shranjuje dodan glas posameznega naslova
     address[] correctVoteCommiters; // 
+    mapping (address => bool) doesMatch; // shranjuje true za naslov, kateremu se ujemata hash in glas
+
 
     mapping(uint256 => address) priceToVoter;
     uint256[] prices;
@@ -24,6 +22,7 @@ struct Round {
     uint256 allWeight;
 
     uint256 oraclePrice; // izracunana cena (tehtano povprecje) ustreznih glasov
+    uint256 oraclePowerPrice;
 } 
 
 struct Voter {
@@ -43,18 +42,18 @@ mapping(address => bool) public isVoter;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 function commitVote(bytes32 voteHash, uint256 roundNumber) public {
-    require(isVoter[msg.sender]);
+    require(isVoter[msg.sender], "Ni voter");
     require(activeCommit(roundNumber),"Prepozno");
-    require(voters[msg.sender].hashes[roundNumber] == 0);
+    require(voters[msg.sender].hashes[roundNumber] == 0, "Ze glasoval");
     voters[msg.sender].hashes[roundNumber] = voteHash;
     rounds[roundNumber].hashes[msg.sender] = voteHash;
 }
     
 
 function revealVote(uint256 vote, uint256 salt, uint256 roundNumber) public {
-    require(isVoter[msg.sender]);
+    require(isVoter[msg.sender],"Ni voter");
     require(activeReveal(roundNumber),"Prepozno");
-    require(voters[msg.sender].votes[roundNumber] == 0);
+    require(voters[msg.sender].votes[roundNumber] == 0, "Ze glasoval");
     require(keccak256(abi.encodePacked(vote, salt)) == rounds[roundNumber].hashes[msg.sender],
     "Se ne ujema"); 
     rounds[roundNumber].doesMatch[msg.sender] = true;
@@ -67,7 +66,7 @@ function revealVote(uint256 vote, uint256 salt, uint256 roundNumber) public {
     rounds[roundNumber].prices.push(vote);
 }
 
-function hashh(uint256 ocena, uint256 salt) public pure returns (bytes32 khash) {
+function hashh(uint256 ocena, uint256 salt) public pure returns (bytes32 khash) { // pomozna funkcija za testiranje
     return keccak256(abi.encodePacked(ocena, salt));
 }
 
@@ -150,7 +149,9 @@ function oraclePriceByPower (uint roundNumber) public returns(uint256 price) {
         computedPowerPrice += rounds[roundNumber].votes[voter] * rounds[roundNumber].currentVotePowerOfThisVoter[voter];
     }
     computedPowerPrice = computedPowerPrice/newWeight;
+    rounds[roundNumber].oraclePowerPrice = computedPowerPrice;
     return computedPowerPrice;
+
 }
 
 
@@ -169,6 +170,8 @@ function delegateVotes (uint256 votePower, address voterAddress) public {
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
+// sposojeno iz https://ethereum.stackexchange.com/a/1518
+
 function quickSort(uint256[] memory arr, int left, int right) public {
     int i = left;
     int j = right;
