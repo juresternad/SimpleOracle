@@ -38,6 +38,9 @@ struct Voter {
 }
 
 Voter[] public voters;
+
+Voter[] public newVoters;
+
 mapping(address => uint256) public mapVoters;
 mapping(uint256 => Round) public rounds; // slovar, ki stevilo runde poveze z rundo
 
@@ -111,6 +114,11 @@ function startRound(uint256 commitTime, uint256 revealTime) public {
         }
         voters[i].currentWeight = voters[i].weight;
     }
+    uint256 m = newVoters.length;
+    for (uint i = 0; i < m; i++) {
+        voters.push(newVoters[i]);
+    }
+    delete newVoters;
     currentRound += 1;
     rounds[currentRound].commitEndDate = block.timestamp + commitTime * 1 seconds;
     rounds[currentRound].revealEndDate = rounds[currentRound].commitEndDate + revealTime * 1 seconds;
@@ -205,7 +213,7 @@ function oraclePriceByPowerByRoundNumber (uint roundNumber) public returns(uint2
 function addVoter (address voter, uint256 weight) public onlyOwner {
     require(mapVoters[voter] == 0, "Voter already exists");
     uint256 i = voters.length;
-    voters.push(Voter(weight, weight));
+    newVoters.push(Voter(weight, weight));
     mapVoters[voter] = i;
 }
 
