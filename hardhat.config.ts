@@ -6,3 +6,7 @@ const config: HardhatUserConfig = {
 };
 
 export default config;
+
+import "@nomiclabs/hardhat-web3";
+
+import "@nomiclabs/hardhat-truffle5";
