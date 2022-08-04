@@ -31,6 +31,7 @@ struct Round {
     uint256 weightedMedianPrice;
 
     address[] revealedVoters; 
+    uint256 count;
 
 } 
 
@@ -92,6 +93,8 @@ function revealVote(uint256 _vote, uint256 _salt, uint256 roundNumber) public {
     rounds[roundNumber].votes[msg.sender].voteHash = 0;
 
     rounds[roundNumber].revealedVoters.push(msg.sender);
+    rounds[roundNumber].count += 1;
+
 
 
 
@@ -99,7 +102,7 @@ function revealVote(uint256 _vote, uint256 _salt, uint256 roundNumber) public {
 
 
 
-function hashh(uint128 ocena, uint128 salt) public view returns (bytes32 khash) { // pomozna funkcija za testiranje
+function hashh(uint256 ocena, uint256 salt) public view returns (bytes32 khash) { // pomozna funkcija za testiranje
     return keccak256(abi.encodePacked(ocena, salt, msg.sender));
 }
 
@@ -114,6 +117,7 @@ function startRound(uint256 commitTime, uint256 revealTime) public onlyOwner {
     currentRound += 1;
     rounds[currentRound].commitEndDate = block.timestamp + commitTime * 1 seconds;
     rounds[currentRound].revealEndDate = rounds[currentRound].commitEndDate + revealTime * 1 seconds;
+    rounds[currentRound].count = 0;
 }
 
 
@@ -127,6 +131,25 @@ function activeReveal (uint256 roundNumber) public view returns (bool active) {
     if(rounds[roundNumber].commitEndDate <= block.timestamp) //
     if(block.timestamp <= rounds[roundNumber].revealEndDate)  // Preveri, da je trenutni cas manjsi od casa revealEndDate v tej rundi.
     return true;
+}
+
+function getPrice (uint256 roundNumber) public returns (uint256 price) {
+    if(rounds[roundNumber].weightedMedianPrice == 0){
+
+        uint256[] memory index = new uint256[](rounds[roundNumber].count);
+        uint256[] memory indexedPrices = new uint256[](rounds[roundNumber].count);
+        uint256[] memory indexedWeights = new uint256[](rounds[roundNumber].count);
+
+        for (uint256 i = 0; i < rounds[roundNumber].count; i++) {
+        index[i] = i;
+        address revealedVoter = rounds[roundNumber].revealedVoters[i];
+        indexedPrices[i] = rounds[roundNumber].votes[revealedVoter].vote;
+        indexedWeights[i] = rounds[roundNumber].votes[revealedVoter].weight;
+        }
+        price = finalizePrice(rounds[roundNumber].count, index, indexedPrices, indexedWeights);
+        rounds[roundNumber].weightedMedianPrice = price;
+    }
+    return rounds[roundNumber].weightedMedianPrice;
 }
 
 //====================================================================
@@ -154,132 +177,158 @@ function addOrUpdate (address voter, uint128 weight) public onlyOwner {
 
 }                           
 
-//====================================================================
+// ====================================================================
 // WeightedMedian
-//====================================================================
+// ====================================================================
 
-// struct Vars {            
-//     uint256 leftSum;            
-//     uint256 rightSum;           
-//     uint256 newLeftSum;         
-//     uint256 newRightSum;        
-//     uint256 pivotWeight;        
-//     uint256 pos;                
-//     uint256 left;               
-//     uint256 right;              
-//     uint256 pivotId;            
-//     uint256 leftMedianWeight;   
-//     uint256 rightMedianWeight; 
-// }
+struct Data {                   
+    uint256 medianIndex;        
+    uint256 leftSum;            
+    uint256 rightSum;           
+    uint256 medianWeight;       
+    uint256 finalMedianPrice;   
+}
 
-// function weightedMedian() public returns (uint256 weightedMedianPrice){
-//     if(rounds[currentRound].weightedMedianPrice != 0) {
-//         return rounds[currentRound].weightedMedianPrice;
-//     }
-//     uint256 count = rounds[currentRound].indexedPrices.length;
-//     for (uint256 i = 0; i < count; i++) {
-//         rounds[currentRound].index[i] = i;
-//     }
-//     (uint256 medianIndex, uint256 leftSum, uint256 rightSum) = modifiedQuickSelect(
-//         0,
-//         count - 1,
-//         0,
-//         0
-//     );
-//     uint256 medianWeight = rounds[currentRound].indexedWeights[rounds[currentRound].index[medianIndex]];
-//     uint256 totalSum = medianWeight + leftSum + rightSum;
-//     uint256 finalMedianPrice = rounds[currentRound].indexedPrices[rounds[currentRound].index[medianIndex]];
-//     if (leftSum + medianWeight == totalSum / 2 && totalSum % 2 == 0) {
-//         finalMedianPrice =
-//             (finalMedianPrice + rounds[currentRound].indexedPrices[rounds[currentRound].index[medianIndex + 1]]) / 2;
-//     }
-//     return finalMedianPrice;
-// }
 
-// function modifiedQuickSelect(
-//     uint256 start,
-//     uint256 end,
-//     uint256 leftSumInit,
-//     uint256 rightSumInit
-//     )
-//     internal view returns (uint256, uint256, uint256)
-//     {
-//     if (start == end) {
-//         return (start, leftSumInit, rightSumInit);
-//     }
-//     Vars memory s;
-//     s.leftSum = leftSumInit;
-//     s.rightSum = rightSumInit;
-//     s.left = start;
-//     s.right = end;
-//     uint256 random = uint256(keccak256(abi.encode(block.difficulty, block.timestamp)));
-//     uint256 totalSum; 
-//     while (true) {
-//         (s.pos,s.newLeftSum,s.newRightSum) = partition(
-//             s.left,
-//             s.right,
-//             (random % (s.right - s.left + 1)) + s.left,
-//             s.leftSum,
-//             s.rightSum
-//         );
+struct Variables {            
+    uint256 leftSum;            
+    uint256 rightSum;           
+    uint256 newLeftSum;         
+    uint256 newRightSum;        
+    uint256 pivotWeight;        
+    uint256 leftMedianWeight;   
+    uint256 rightMedianWeight;  
+}
+
+struct Positions {            
+    uint256 pos;                
+    uint256 left;               
+    uint256 right;              
+    uint256 pivotId;            
+}
+
+
+function finalizePrice(uint256 count, uint256[] memory index, uint256[] memory indexedPrices, uint256[] memory indexedWeights) internal view returns(uint256 price) {
+
+    Data memory data;
+    
+    (data.medianIndex, data.leftSum, data.rightSum) = modifiedQuickSelect(
+        0,
+        count - 1,
+        0,
+        0,
+        index,
+        indexedPrices,
+        indexedWeights
+    );
+
+    data.medianWeight = indexedWeights[index[data.medianIndex]];
+    uint256 totalSum = data.medianWeight + data.leftSum + data.rightSum;
+    data.finalMedianPrice = indexedPrices[index[data.medianIndex]];
+    if (data.leftSum + data.medianWeight == totalSum / 2 && totalSum % 2 == 0) {
+        data.finalMedianPrice =
+            (data.finalMedianPrice + index[data.medianIndex + 1]) / 2;
+    }
+
+    return data.finalMedianPrice;
+}
+
+function modifiedQuickSelect(
+    uint256 start,
+    uint256 end,
+    uint256 leftSumInit,
+    uint256 rightSumInit,
+    uint256[] memory index,
+    uint256[] memory indexedPrices,
+    uint256[] memory indexedWeights
+    )
+
+    internal view returns (uint256, uint256, uint256)
+    {
+    if (start == end) {
+        return (start, leftSumInit, rightSumInit);
+    }
+    Variables memory vars;
+    Positions memory pos;
+
+    vars.leftSum = leftSumInit;
+    vars.rightSum = rightSumInit;
+    pos.left = start;
+    pos.right = end;
+    uint256 random = uint256(keccak256(abi.encode(block.difficulty, block.timestamp)));
+    uint256 totalSum; 
+    while (true) {
+        (pos.pos,vars.newLeftSum,vars.newRightSum) = partition(
+            pos.left,
+            pos.right,
+            (random % (pos.right - pos.left + 1)) + pos.left,
+            vars.leftSum,
+            vars.rightSum,
+            index,
+            indexedPrices,
+            indexedWeights
+        );
         
-//         s.pivotId = rounds[currentRound].index[s.pos];
-//         s.pivotWeight = rounds[currentRound].indexedWeights[s.pivotId];
-//         totalSum = s.pivotWeight + s.newLeftSum + s.newRightSum;
+        pos.pivotId = index[pos.pos];
+        vars.pivotWeight = indexedWeights[pos.pivotId];
+        totalSum = vars.pivotWeight + vars.newLeftSum + vars.newRightSum;
 
-//         s.leftMedianWeight = totalSum / 2 + (totalSum % 2);  
-//         s.rightMedianWeight = totalSum - s.leftMedianWeight; 
-//         if (s.newLeftSum >= s.leftMedianWeight && s.leftMedianWeight > s.leftSum) { 
-//             s.right = s.pos - 1;
-//             s.rightSum = s.pivotWeight + s.newRightSum;
-//         } else if (s.newRightSum > s.rightMedianWeight && s.rightMedianWeight > s.rightSum) {
-//             s.left = s.pos + 1;
-//             s.leftSum = s.pivotWeight + s.newLeftSum;
-//         } else {
-//             return (s.pos, s.newLeftSum, s.newRightSum);
-//         }
+        vars.leftMedianWeight = totalSum / 2 + (totalSum % 2);  
+        vars.rightMedianWeight = totalSum - vars.leftMedianWeight; 
+        if (vars.newLeftSum >= vars.leftMedianWeight && vars.leftMedianWeight > vars.leftSum) { 
+            pos.right = pos.pos - 1;
+            vars.rightSum = vars.pivotWeight + vars.newRightSum;
+        } else if (vars.newRightSum > vars.rightMedianWeight && vars.rightMedianWeight > vars.rightSum) {
+            pos.left = pos.pos + 1;
+            vars.leftSum = vars.pivotWeight + vars.newLeftSum;
+        } else {
+            return (pos.pos, vars.newLeftSum, vars.newRightSum);
+        }
 
-//     }
+    }
 
-//     return (0, 0, 0);
-// }
+    return (0, 0, 0);
+}
 
-// function partition(
-//     uint256 left0,
-//     uint256 right0,
-//     uint256 pivotId,
-//     uint256 leftSum0, 
-//     uint256 rightSum0
+function partition (
+    uint256 left0,
+    uint256 right0,
+    uint256 pivotId,
+    uint256 leftSum0, 
+    uint256 rightSum0,
+    uint256[] memory index,
+    uint256[] memory indexedPrices,
+    uint256[] memory indexedWeights
 
-// )
-//     internal view returns (uint256, uint256, uint256)
-// {
-//     uint256[] memory sums = new uint256[](2);
-//     sums[0] = leftSum0;
-//     sums[1] = rightSum0;
-//     uint256 left = left0;
-//     uint256 right = right0;
-//     uint256 pivotValue = rounds[currentRound].indexedPrices[rounds[currentRound].index[pivotId]];
-//     swap(pivotId, right, rounds[currentRound].index);
-//     uint256 storeIndex = left;
-//     for (uint256 i = left; i < right; i++) {
-//         uint256 eltId = rounds[currentRound].index[i];
-//         if (rounds[currentRound].indexedPrices[eltId] < pivotValue) {
-//             sums[0] += rounds[currentRound].indexedWeights[eltId];
-//             swap(storeIndex, i, rounds[currentRound].index);
-//             storeIndex++;
-//         } else {
-//             sums[1] += rounds[currentRound].indexedWeights[eltId];
-//         }
-//     }
-//     swap(right, storeIndex, rounds[currentRound].index);
-//     return (storeIndex, sums[0], sums[1]);
-// }
+)
+    internal pure returns (uint256, uint256, uint256)
+{
+    uint256 pivotValue = indexedPrices[index[pivotId]];
+    uint256[] memory sums = new uint256[](2);
+    sums[0] = leftSum0;
+    sums[1] = rightSum0;
+    uint256 left = left0;
+    uint256 right = right0;
+    swap(pivotId, right, index);
+    uint256 storeIndex = left;
+    for (uint256 i = left; i < right; i++) {
+        uint256 eltId = index[i];
+        if (indexedPrices[eltId] < pivotValue) {
+            sums[0] += indexedWeights[eltId];
+            swap(storeIndex, i, index);
+            storeIndex++;
+        } else {
+            sums[1] += indexedWeights[eltId];
+        }
+    }
+    swap(right, storeIndex, index);
+    return (storeIndex, sums[0], sums[1]);
+}
 
-// function swap(uint256 i, uint256 j, uint256[] memory index) internal pure {
-//     if (i == j) return;
-//     (index[i], index[j]) = (index[j], index[i]);
-// }
+function swap(uint256 i, uint256 j, uint256[] memory index) internal pure {
+    if (i == j) return;
+    (index[i], index[j]) = (index[j], index[i]);
+}
 
 
 }
