@@ -113,13 +113,7 @@ contract JureIVOracle {
      * @param commitTime              Duration of the commit phase
      * @param revealTime              Duration of the reveal phase (starts "immediately" after the commit phase)
      */
-    function startRound(
-        uint256 commitTime,
-        uint256 revealTime
-    )
-        public
-        onlyOwner
-    {
+    function startRound(uint256 commitTime, uint256 revealTime) public onlyOwner {
         // Previous round's reveal phase must have ended
         require(rounds[currentRound].revealEndDate <= block.timestamp, ERR_PREVIOUS_ROUND_STILL_ACTIVE);
         currentRound += 1;
@@ -161,7 +155,7 @@ contract JureIVOracle {
         if (rounds[roundNumber].weightedMedianPrice == 0) {
             // case of weightedMedianPrice of the round not yet been computed
             uint256 count = rounds[roundNumber].revealedVoters.length;
-            // sets the memory arrays
+            // prepares the memory arrays
             uint256[] memory index = new uint256[](count);
             uint256[] memory indexedPrices = new uint256[](count);
             uint256[] memory indexedWeights = new uint256[](count);
@@ -228,7 +222,7 @@ contract JureIVOracle {
     // ====================================================================
 
     struct Data {                   // Used for storing the results of weighted median calculation
-        uint256 medianIndex;        // Index of the median price (in array index)
+        uint256 medianIndex;        // Index of the median price (in memory array index)
         uint256 leftSum;            // Auxiliary sum of weights left from the median price
         uint256 rightSum;           // Auxiliary sum of weights right from the median price
         uint256 medianWeight;       // Weight of the voter's whose vote is the median price
@@ -246,17 +240,17 @@ contract JureIVOracle {
     }
 
     struct Positions {              // Used for storing positions in modified quick select algorithm
-        uint256 pos;                // Position index (in array index)
-        uint256 left;               // Index left to the position index (in array index)
-        uint256 right;              // Index right to the position index (in array index)
-        uint256 pivotId;            // Pivot index (in array index)
+        uint256 pos;                // Position index (in memory array index)
+        uint256 left;               // Index left to the position index (in memory array index)
+        uint256 right;              // Index right to the position index (in memory array index)
+        uint256 pivotId;            // Pivot index (in memory array index)
     }
     
     /**
      * @notice Reveals voter's hash
      * @param index                    Permutation of indices of the input arrays that determines the sorting of indexed prices
-     * @param indexedPrices            Positional array of indexed prices
-     * @param indexedWeights           Positional array of indexed weights
+     * @param indexedPrices            Positional memory array of indexed prices
+     * @param indexedWeights           Positional memory array of indexed weights
      * @return price                   Weighted median price of the round
      */
     function finalizePrice(
@@ -266,6 +260,7 @@ contract JureIVOracle {
         uint256[] memory indexedWeights
     ) internal view returns (uint256 price) {
         Data memory data;
+        // Performs modified quick select algorithm
         (data.medianIndex, data.leftSum, data.rightSum) = modifiedQuickSelect(
             0,
             count - 1,
@@ -279,11 +274,16 @@ contract JureIVOracle {
         uint256 totalSum = data.medianWeight + data.leftSum + data.rightSum;
         data.finalMedianPrice = indexedPrices[index[data.medianIndex]];
         if (data.leftSum + data.medianWeight == totalSum / 2 && totalSum % 2 == 0) {
+            // Case of the median price being in the middle between two prices
+            // Takes their awerage
             data.finalMedianPrice = (data.finalMedianPrice + indexedPrices[index[data.medianIndex + 1]]) / 2;
         }
         return data.finalMedianPrice;
     }
-
+    
+    /**
+     * @notice Performs modified quick select algorithm
+     */
     function modifiedQuickSelect(
         uint256 start,
         uint256 end,
@@ -293,13 +293,7 @@ contract JureIVOracle {
         uint256[] memory indexedPrices,
         uint256[] memory indexedWeights
     )
-        internal
-        view
-        returns (
-            uint256,
-            uint256,
-            uint256
-        )
+        internal view returns ( uint256, uint256, uint256 )
     {
         if (start == end) {
             return (start, leftSumInit, rightSumInit);
@@ -334,14 +328,12 @@ contract JureIVOracle {
             vars.leftMedianWeight = totalSum / 2 + (totalSum % 2);
             vars.rightMedianWeight = totalSum - vars.leftMedianWeight;
             if (
-                vars.newLeftSum >= vars.leftMedianWeight &&
-                vars.leftMedianWeight > leftSumInit
+                vars.newLeftSum >= vars.leftMedianWeight && vars.leftMedianWeight > leftSumInit
             ) {
                 pos.right = pos.pos - 1;
                 vars.rightSum = vars.pivotWeight + vars.newRightSum;
             } else if (
-                vars.newRightSum > vars.rightMedianWeight &&
-                vars.rightMedianWeight > rightSumInit
+                vars.newRightSum > vars.rightMedianWeight && vars.rightMedianWeight > rightSumInit
             ) {
                 pos.left = pos.pos + 1;
                 vars.leftSum = vars.pivotWeight + vars.newLeftSum;
@@ -354,6 +346,9 @@ contract JureIVOracle {
         return (0, 0, 0);
     }
 
+    /**
+     * @notice Partitions the memory array index according to the pivot
+     */
     function partition(
         uint256 left0,
         uint256 right0,
@@ -364,13 +359,7 @@ contract JureIVOracle {
         uint256[] memory indexedPrices,
         uint256[] memory indexedWeights
     )
-        internal
-        pure
-        returns (
-            uint256,
-            uint256,
-            uint256
-        )
+        internal pure returns ( uint256, uint256, uint256 )
     {
         uint256 pivotValue = indexedPrices[index[pivotId]];
         uint256[] memory sums = new uint256[](2);
@@ -393,12 +382,10 @@ contract JureIVOracle {
         swap(right, storeIndex, index);
         return (storeIndex, sums[0], sums[1]);
     }
-
-    function swap(
-        uint256 i,
-        uint256 j,
-        uint256[] memory index
-    ) internal pure {
+    /**
+     * @notice Swaps indices `i` and `j` in the memory array index
+     */
+    function swap(uint256 i, uint256 j, uint256[] memory index) internal pure {
         if (i == j) return;
         (index[i], index[j]) = (index[j], index[i]);
     }
