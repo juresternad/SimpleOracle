@@ -11,7 +11,7 @@ contract JureIVOracleMock is JureIVOracle {
 
     }
 
-    function forceRevealPhase(uint256 roundNumber) public {
-        rounds[roundNumber].commitEndDate = block.timestamp + 0 * 1 seconds;
-    }
+    // function forceRevealPhase(uint256 roundNumber) public {
+    //     rounds[roundNumber].commitEndDate = block.timestamp + 0 * 1 seconds;
+    // }
 }
