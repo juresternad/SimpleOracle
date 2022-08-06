@@ -8,6 +8,7 @@ contract JureIVOracle {
     // Errors
     //====================================================================
     string internal constant NOT_OWNER = "You are not the owner";
+    string internal constant ERR_TOO_MANY_VOTERS = "There are already 100 voters";
     string internal constant ERR_COMMIT_NOT_ACTIVE = "Commit phase for chosen round not active";
     string internal constant ERR_REVEAL_NOT_ACTIVE = "Reveal phase for chosen round not active";
     string internal constant ERR_HASH_DOES_NOT_MATCH = "Hash doesn't match with vote and salt";
@@ -32,7 +33,7 @@ contract JureIVOracle {
         // Hash of the vote (+ salt and msg.sender)
         bytes32 voteHash;
         // Successfully revealed vote
-        uint256 vote;
+        uint128 vote;
         // Weight of vote's voter
         uint128 weight;
     }
@@ -94,6 +95,7 @@ contract JureIVOracle {
                 }
             }
         }
+        require(voters.length <= 100, ERR_TOO_MANY_VOTERS);
         if (weights[_voter] != 0) {
             // case of updating the existing voter's weight
             weights[_voter] = _weight;
@@ -162,8 +164,8 @@ contract JureIVOracle {
             for (uint256 i = 0; i < count; i++) {
                 index[i] = i;
                 address revealedVoter = rounds[_roundNumber].revealedVoters[i];
-                indexedPrices[i] = rounds[_roundNumber] .votes[revealedVoter] .vote;
-                indexedWeights[i] = rounds[_roundNumber] .votes[revealedVoter] .weight;
+                indexedPrices[i] = uint256(rounds[_roundNumber].votes[revealedVoter].vote);
+                indexedWeights[i] = rounds[_roundNumber].votes[revealedVoter].weight;
             }
             // uses finalizePrice and updates the round's weightedMedianPrice
             _price = _finalizePrice(count, index, indexedPrices, indexedWeights);
@@ -198,13 +200,13 @@ contract JureIVOracle {
      * @param _salt                     Salt he used of the hash
      * @param _roundNumber              Number of the round
      */
-    function revealVote(uint256 _vote, uint256 _salt, uint256 _roundNumber) external {
+    function revealVote(uint128 _vote, uint256 _salt, uint256 _roundNumber) external {
         // Checks round's reveal-phase activity
         require(activeReveal(_roundNumber), ERR_REVEAL_NOT_ACTIVE);
         // Finds the voter's hash
         bytes32 voteHash = rounds[_roundNumber].votes[msg.sender].voteHash;
         // Checks matching of the vote's hash, vote, salt and msg.sender
-        require(keccak256(abi.encodePacked(_vote, _salt, msg.sender)) == voteHash, ERR_HASH_DOES_NOT_MATCH);
+        require(keccak256(abi.encodePacked(uint256(_vote), _salt, msg.sender)) == voteHash, ERR_HASH_DOES_NOT_MATCH);
         // Updates voter's vote, weight and hash in the round
         rounds[_roundNumber].votes[msg.sender].vote = _vote;
         rounds[_roundNumber].votes[msg.sender].weight = weights[msg.sender];
@@ -247,7 +249,7 @@ contract JureIVOracle {
      * @param _index                    Permutation of indices of the input arrays that determines the sorting of indexed prices
      * @param _indexedPrices            Positional memory array of indexed prices
      * @param _indexedWeights           Positional memory array of indexed weights
-     * @return price                   Weighted median price of the round
+     * @return price                    Weighted median price of the round
      */
     function _finalizePrice(
         uint256 count,
@@ -386,4 +388,5 @@ contract JureIVOracle {
         (_index[i], _index[j]) = (_index[j], _index[i]);
     }
 }
+
 

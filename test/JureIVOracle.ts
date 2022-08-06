@@ -78,7 +78,7 @@ describe("JureIVOracle.sol", function () {
       await time.increase(tm1);
       await expect(hardhatOracle.voters(0)).to.be.reverted;
 
-      
+
     });
 
 
@@ -253,162 +253,161 @@ describe("JureIVOracle.sol", function () {
 
 
     });
+  });
 
-    describe("Weighted median", function () {
+  describe("Weighted median", function () {
 
 
-      it("MedianPrice1", async function () {
-        const { owner, addr1, addr2, addr3, addr4 } = await loadFixture(deployOracleFixture);
-        const Mock = await ethers.getContractFactory("JureIVOracleMock");
-        const hardhatOracleMock = await Mock.deploy();
-        const weights = [10, 20, 30, 40];
-        const signers = [addr1, addr2, addr3, addr4]
-        const addresses = [addr1.address, addr2.address, addr3.address, addr4.address]
-        const votes = [80, 50, 40, 10];
-        const salt = [10, 20, 30, 40];
+    it("MedianPrice1", async function () {
+      const { owner, addr1, addr2, addr3, addr4 } = await loadFixture(deployOracleFixture);
+      const Mock = await ethers.getContractFactory("JureIVOracleMock");
+      const hardhatOracleMock = await Mock.deploy();
+      const weights = [10, 20, 30, 40];
+      const signers = [addr1, addr2, addr3, addr4]
+      const addresses = [addr1.address, addr2.address, addr3.address, addr4.address]
+      const votes = [80, 50, 40, 10];
+      const salt = [10, 20, 30, 40];
 
-        await hardhatOracleMock.connect(owner).startRound(20, 20)
-        for (var i = 0; i < 4; i++) {
-          await hardhatOracleMock.connect(owner).addOrUpdate(addresses[i], weights[i]);
-        }
-        const currentRound = await hardhatOracleMock.currentRound();
+      await hardhatOracleMock.connect(owner).startRound(20, 20)
+      for (var i = 0; i < 4; i++) {
+        await hardhatOracleMock.connect(owner).addOrUpdate(addresses[i], weights[i]);
+      }
+      const currentRound = await hardhatOracleMock.currentRound();
 
-        var voteHash = new Array();
-        for (var i = 0; i < 4; i++) {
-          voteHash.push(ethers.utils.solidityKeccak256(["uint256", "uint256", "address"], [votes[i], salt[i], addresses[i]]));
-        }
-        for (var i = 0; i < 4; i++) {
-          await hardhatOracleMock.connect(signers[i]).commitVote(voteHash[i], currentRound);
-        }
-        const tm = 20;
-        await time.increase(tm);
-        for (var i = 0; i < 4; i++) {
-          await hardhatOracleMock.connect(signers[i]).revealVote(votes[i], salt[i], currentRound);
-        }
-        await hardhatOracleMock.connect(owner).getPrice(currentRound);
-        const round = await hardhatOracleMock.rounds(currentRound);
-        await expect(round.weightedMedianPrice).to.equal(40);
-
-      });
-
-      it("MedianPrice2", async function () {
-        const { owner, addr1, addr2, addr3, addr4 } = await loadFixture(deployOracleFixture);
-        const Mock = await ethers.getContractFactory("JureIVOracleMock");
-        const hardhatOracleMock = await Mock.deploy();
-        const weights = [100, 50, 200, 60];
-        const signers = [addr1, addr2, addr3, addr4]
-        const addresses = [addr1.address, addr2.address, addr3.address, addr4.address]
-        const votes = [45, 42, 100, 10];
-        const salt = [10, 20, 30, 40];
-
-        await hardhatOracleMock.connect(owner).startRound(20, 20)
-        for (var i = 0; i < 4; i++) {
-          await hardhatOracleMock.connect(owner).addOrUpdate(addresses[i], weights[i]);
-        }
-        const currentRound = await hardhatOracleMock.currentRound();
-
-        var voteHash = new Array();
-        for (var i = 0; i < 4; i++) {
-          voteHash.push(ethers.utils.solidityKeccak256(["uint256", "uint256", "address"], [votes[i], salt[i], addresses[i]]));
-        }
-        for (var i = 0; i < 4; i++) {
-          await hardhatOracleMock.connect(signers[i]).commitVote(voteHash[i], currentRound);
-        }
-        const tm = 20;
-        await time.increase(tm);
-        for (var i = 0; i < 4; i++) {
-          await hardhatOracleMock.connect(signers[i]).revealVote(votes[i], salt[i], currentRound);
-        }
-        await hardhatOracleMock.connect(owner).getPrice(currentRound);
-        const round = await hardhatOracleMock.rounds(currentRound);
-        await expect(round.weightedMedianPrice).to.equal(45);
-
-      });
-
-      it("MedianPrice in the middle, totalSum % 2 == 0, should return average of middle prices", async function () {
-        const { owner, addr1, addr2, addr3, addr4 } = await loadFixture(deployOracleFixture);
-        const Mock = await ethers.getContractFactory("JureIVOracleMock");
-        const hardhatOracleMock = await Mock.deploy();
-        const weights = [10, 10, 10, 10];
-        const signers = [addr1, addr2, addr3, addr4]
-        const addresses = [addr1.address, addr2.address, addr3.address, addr4.address]
-        const votes = [10, 10, 20, 20];
-        const salt = [10, 20, 30, 40];
-
-        await hardhatOracleMock.connect(owner).startRound(20, 20)
-        for (var i = 0; i < 4; i++) {
-          await hardhatOracleMock.connect(owner).addOrUpdate(addresses[i], weights[i]);
-        }
-        const currentRound = await hardhatOracleMock.currentRound();
-        const tm1 = 5;
-        await time.increase(tm1);
-        var voteHash = new Array();
-        for (var i = 0; i < 4; i++) {
-          voteHash.push(ethers.utils.solidityKeccak256(["uint256", "uint256", "address"], [votes[i], salt[i], addresses[i]]));
-        }
-        for (var i = 0; i < 4; i++) {
-          await hardhatOracleMock.connect(signers[i]).commitVote(voteHash[i], currentRound);
-        }
-        const tm2 = 20;
-        await time.increase(tm2);
-        for (var i = 0; i < 4; i++) {
-          await hardhatOracleMock.connect(signers[i]).revealVote(votes[i], salt[i], currentRound);
-        }
-        await hardhatOracleMock.connect(owner).getPrice(currentRound);
-        const round = await hardhatOracleMock.rounds(currentRound);
-        await expect(round.weightedMedianPrice).to.equal(15);
-
-      });
-
-      it("MedianPrice 1 vote", async function () {
-        const { owner, addr1 } = await loadFixture(deployOracleFixture);
-        const Mock = await ethers.getContractFactory("JureIVOracleMock");
-        const hardhatOracleMock = await Mock.deploy();
-        const weight = 10;
-        await hardhatOracleMock.connect(owner).addOrUpdate(addr1.address, weight);
-        await hardhatOracleMock.connect(owner).startRound(30, 40);
-        const currentRound = await hardhatOracleMock.currentRound();
-        const vote = 10;
-        const salt = 11;
-        const voteHash = ethers.utils.solidityKeccak256(["uint256", "uint256", "address"], [vote, salt, addr1.address]);
-        const tm1 = 10;
-        await time.increase(tm1);
-        await hardhatOracleMock.connect(addr1).commitVote(voteHash, currentRound);
-        const tm2 = 30;
-        await time.increase(tm2);
-        await hardhatOracleMock.connect(addr1).revealVote(vote, salt, currentRound);
-        await hardhatOracleMock.connect(owner).getPrice(currentRound);
-        const round = await hardhatOracleMock.rounds(currentRound);
-        await expect(round.weightedMedianPrice).to.equal(10);
-
-      });
-
-      it("MedianPrice 0 votes", async function () {
-        const { owner, addr1 } = await loadFixture(deployOracleFixture);
-        const Mock = await ethers.getContractFactory("JureIVOracleMock");
-        const hardhatOracleMock = await Mock.deploy();
-        const weight = 10;
-        await hardhatOracleMock.connect(owner).startRound(30, 40);
-        const currentRound = await hardhatOracleMock.currentRound();
-        await hardhatOracleMock.connect(owner).getPrice(currentRound);
-        const round = await hardhatOracleMock.rounds(currentRound);
-        await expect(round.weightedMedianPrice).to.equal(0);
-
-      });
+      var voteHash = new Array();
+      for (var i = 0; i < 4; i++) {
+        voteHash.push(ethers.utils.solidityKeccak256(["uint256", "uint256", "address"], [votes[i], salt[i], addresses[i]]));
+      }
+      for (var i = 0; i < 4; i++) {
+        await hardhatOracleMock.connect(signers[i]).commitVote(voteHash[i], currentRound);
+      }
+      const tm = 20;
+      await time.increase(tm);
+      for (var i = 0; i < 4; i++) {
+        await hardhatOracleMock.connect(signers[i]).revealVote(votes[i], salt[i], currentRound);
+      }
+      await hardhatOracleMock.connect(owner).getPrice(currentRound);
+      const round = await hardhatOracleMock.rounds(currentRound);
+      await expect(round.weightedMedianPrice).to.equal(40);
 
     });
 
+    it("MedianPrice2", async function () {
+      const { owner, addr1, addr2, addr3, addr4 } = await loadFixture(deployOracleFixture);
+      const Mock = await ethers.getContractFactory("JureIVOracleMock");
+      const hardhatOracleMock = await Mock.deploy();
+      const weights = [100, 50, 200, 60];
+      const signers = [addr1, addr2, addr3, addr4]
+      const addresses = [addr1.address, addr2.address, addr3.address, addr4.address]
+      const votes = [45, 42, 100, 10];
+      const salt = [10, 20, 30, 40];
+
+      await hardhatOracleMock.connect(owner).startRound(20, 20)
+      for (var i = 0; i < 4; i++) {
+        await hardhatOracleMock.connect(owner).addOrUpdate(addresses[i], weights[i]);
+      }
+      const currentRound = await hardhatOracleMock.currentRound();
+
+      var voteHash = new Array();
+      for (var i = 0; i < 4; i++) {
+        voteHash.push(ethers.utils.solidityKeccak256(["uint256", "uint256", "address"], [votes[i], salt[i], addresses[i]]));
+      }
+      for (var i = 0; i < 4; i++) {
+        await hardhatOracleMock.connect(signers[i]).commitVote(voteHash[i], currentRound);
+      }
+      const tm = 20;
+      await time.increase(tm);
+      for (var i = 0; i < 4; i++) {
+        await hardhatOracleMock.connect(signers[i]).revealVote(votes[i], salt[i], currentRound);
+      }
+      await hardhatOracleMock.connect(owner).getPrice(currentRound);
+      const round = await hardhatOracleMock.rounds(currentRound);
+      await expect(round.weightedMedianPrice).to.equal(45);
+
+    });
+
+    it("MedianPrice in the middle, totalSum % 2 == 0, should return average of middle prices", async function () {
+      const { owner, addr1, addr2, addr3, addr4 } = await loadFixture(deployOracleFixture);
+      const Mock = await ethers.getContractFactory("JureIVOracleMock");
+      const hardhatOracleMock = await Mock.deploy();
+      const weights = [10, 10, 10, 10];
+      const signers = [addr1, addr2, addr3, addr4]
+      const addresses = [addr1.address, addr2.address, addr3.address, addr4.address]
+      const votes = [10, 10, 20, 20];
+      const salt = [10, 20, 30, 40];
+
+      await hardhatOracleMock.connect(owner).startRound(20, 20)
+      for (var i = 0; i < 4; i++) {
+        await hardhatOracleMock.connect(owner).addOrUpdate(addresses[i], weights[i]);
+      }
+      const currentRound = await hardhatOracleMock.currentRound();
+      const tm1 = 5;
+      await time.increase(tm1);
+      var voteHash = new Array();
+      for (var i = 0; i < 4; i++) {
+        voteHash.push(ethers.utils.solidityKeccak256(["uint256", "uint256", "address"], [votes[i], salt[i], addresses[i]]));
+      }
+      for (var i = 0; i < 4; i++) {
+        await hardhatOracleMock.connect(signers[i]).commitVote(voteHash[i], currentRound);
+      }
+      const tm2 = 20;
+      await time.increase(tm2);
+      for (var i = 0; i < 4; i++) {
+        await hardhatOracleMock.connect(signers[i]).revealVote(votes[i], salt[i], currentRound);
+      }
+      await hardhatOracleMock.connect(owner).getPrice(currentRound);
+      const round = await hardhatOracleMock.rounds(currentRound);
+      await expect(round.weightedMedianPrice).to.equal(15);
+
+    });
+
+    it("MedianPrice 1 vote", async function () {
+      const { owner, addr1 } = await loadFixture(deployOracleFixture);
+      const Mock = await ethers.getContractFactory("JureIVOracleMock");
+      const hardhatOracleMock = await Mock.deploy();
+      const weight = 10;
+      await hardhatOracleMock.connect(owner).addOrUpdate(addr1.address, weight);
+      await hardhatOracleMock.connect(owner).startRound(30, 40);
+      const currentRound = await hardhatOracleMock.currentRound();
+      const vote = 10;
+      const salt = 11;
+      const voteHash = ethers.utils.solidityKeccak256(["uint256", "uint256", "address"], [vote, salt, addr1.address]);
+      const tm1 = 10;
+      await time.increase(tm1);
+      await hardhatOracleMock.connect(addr1).commitVote(voteHash, currentRound);
+      const tm2 = 30;
+      await time.increase(tm2);
+      await hardhatOracleMock.connect(addr1).revealVote(vote, salt, currentRound);
+      await hardhatOracleMock.connect(owner).getPrice(currentRound);
+      const round = await hardhatOracleMock.rounds(currentRound);
+      await expect(round.weightedMedianPrice).to.equal(10);
+
+    });
+
+    it("MedianPrice 0 votes", async function () {
+      const { owner, addr1 } = await loadFixture(deployOracleFixture);
+      const Mock = await ethers.getContractFactory("JureIVOracleMock");
+      const hardhatOracleMock = await Mock.deploy();
+      const weight = 10;
+      await hardhatOracleMock.connect(owner).startRound(30, 40);
+      const currentRound = await hardhatOracleMock.currentRound();
+      await hardhatOracleMock.connect(owner).getPrice(currentRound);
+      const round = await hardhatOracleMock.rounds(currentRound);
+      await expect(round.weightedMedianPrice).to.equal(0);
+
+    });
 
   });
 
 
-
-
-
-
-
-
-
-
-
 });
+
+
+
+
+
+
+
+
+
+
