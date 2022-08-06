@@ -82,7 +82,7 @@ contract JureIVOracle {
      * @param _voter                 Voter's address
      * @param _weight                New weight
      */
-    function addOrUpdate(address _voter, uint128 _weight) public onlyOwner {
+    function addOrUpdate(address _voter, uint128 _weight) external onlyOwner {
         if (_weight == 0) {
             // case of deleting the voter
             weights[_voter] = 0;
@@ -113,7 +113,7 @@ contract JureIVOracle {
      * @param _commitTime              Duration of the commit phase
      * @param _revealTime              Duration of the reveal phase (starts "immediately" after the commit phase)
      */
-    function startRound(uint256 _commitTime, uint256 _revealTime) public onlyOwner {
+    function startRound(uint256 _commitTime, uint256 _revealTime) external onlyOwner {
         // Previous round's reveal phase must have ended
         require(rounds[currentRound].revealEndDate <= block.timestamp, ERR_PREVIOUS_ROUND_STILL_ACTIVE);
         currentRound += 1;
@@ -147,7 +147,7 @@ contract JureIVOracle {
      * @param _roundNumber              Number of the round
      * @return _price                   Weighted median price of the round
      */
-    function getPrice(uint256 _roundNumber) public returns (uint256 _price) {
+    function getPrice(uint256 _roundNumber) external returns (uint256 _price) {
         if (rounds[_roundNumber].revealedVoters.length == 0) {
             // case of 0 successfully revealed votes
             return 0;
@@ -181,7 +181,7 @@ contract JureIVOracle {
      * @param _voteHash                Voter's hash of the vote
      * @param _roundNumber              Number of the round
      */
-    function commitVote(bytes32 _voteHash, uint256 _roundNumber) public {
+    function commitVote(bytes32 _voteHash, uint256 _roundNumber) external {
         // Checks round's commit-phase activity
         require(activeCommit(_roundNumber), ERR_COMMIT_NOT_ACTIVE);
         // Prevents non-voters from commiting the hash
@@ -194,11 +194,11 @@ contract JureIVOracle {
 
     /**
      * @notice Reveals voter's hash
-     * @param _vote                    Voter's vote
-     * @param _salt                    Salt he used of the hash
+     * @param _vote                     Voter's vote
+     * @param _salt                     Salt he used of the hash
      * @param _roundNumber              Number of the round
      */
-    function revealVote(uint256 _vote, uint256 _salt, uint256 _roundNumber) public {
+    function revealVote(uint256 _vote, uint256 _salt, uint256 _roundNumber) external {
         // Checks round's reveal-phase activity
         require(activeReveal(_roundNumber), ERR_REVEAL_NOT_ACTIVE);
         // Finds the voter's hash
@@ -386,3 +386,4 @@ contract JureIVOracle {
         (_index[i], _index[j]) = (_index[j], _index[i]);
     }
 }
+
