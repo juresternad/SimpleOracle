@@ -1,22 +1,20 @@
 import { artifacts, ethers, web3 } from "hardhat";
 
 const { expect } = require("chai");
+const { time,} = require('@openzeppelin/test-helpers');
 const keccak256 = require('keccak256');
-const {
-  time, BN, submitHash, get
-} = require('@openzeppelin/test-helpers');
 
 const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
 
-const JureIVOracleMock = artifacts.require("./JureIVOracleMock.sol")
+const SimpleOracleMock = artifacts.require("./SimpleOracleMock.sol")
 
 
 
-describe("JureIVOracle.sol", function () {
+describe("SimpleOracle.sol", function () {
 
 
   async function deployOracleFixture() {
-    const Oracle = await ethers.getContractFactory("JureIVOracle");
+    const Oracle = await ethers.getContractFactory("SimpleOracle");
     const [owner, addr1, addr2, addr3, addr4] = await ethers.getSigners();
     const hardhatOracle = await Oracle.deploy();
     await hardhatOracle.deployed();
@@ -129,7 +127,7 @@ describe("JureIVOracle.sol", function () {
 
     it("Should let voter to commit hash and store it correctly", async function () {
       const { hardhatOracle, owner, addr1 } = await loadFixture(deployOracleFixture);
-      const Mock = await ethers.getContractFactory("JureIVOracleMock");
+      const Mock = await ethers.getContractFactory("SimpleOracleMock");
       const hardhatOracleMock = await Mock.deploy();
       const weight = 10;
       await hardhatOracleMock.connect(owner).addOrUpdate(addr1.address, weight);
@@ -207,7 +205,7 @@ describe("JureIVOracle.sol", function () {
 
     it("Should let voter to reveal vote, store it correctly and remove voteHash (store value as 0)", async function () {
       const { owner, addr1 } = await loadFixture(deployOracleFixture);
-      const Mock = await ethers.getContractFactory("JureIVOracleMock");
+      const Mock = await ethers.getContractFactory("SimpleOracleMock");
       const hardhatOracleMock = await Mock.deploy();
       const weight = 10;
       await hardhatOracleMock.connect(owner).addOrUpdate(addr1.address, weight);
@@ -232,7 +230,7 @@ describe("JureIVOracle.sol", function () {
     });
     it("Shouldn't let voter to reveal vote that doesn't match with same-round voteHash", async function () {
       const { owner, addr1 } = await loadFixture(deployOracleFixture);
-      const Mock = await ethers.getContractFactory("JureIVOracleMock");
+      const Mock = await ethers.getContractFactory("SimpleOracleMock");
       const hardhatOracleMock = await Mock.deploy();
       const weight = 10;
       await hardhatOracleMock.connect(owner).addOrUpdate(addr1.address, weight);
@@ -260,7 +258,7 @@ describe("JureIVOracle.sol", function () {
 
     it("MedianPrice1", async function () {
       const { owner, addr1, addr2, addr3, addr4 } = await loadFixture(deployOracleFixture);
-      const Mock = await ethers.getContractFactory("JureIVOracleMock");
+      const Mock = await ethers.getContractFactory("SimpleOracleMock");
       const hardhatOracleMock = await Mock.deploy();
       const weights = [10, 20, 30, 40];
       const signers = [addr1, addr2, addr3, addr4]
@@ -294,7 +292,7 @@ describe("JureIVOracle.sol", function () {
 
     it("MedianPrice2", async function () {
       const { owner, addr1, addr2, addr3, addr4 } = await loadFixture(deployOracleFixture);
-      const Mock = await ethers.getContractFactory("JureIVOracleMock");
+      const Mock = await ethers.getContractFactory("SimpleOracleMock");
       const hardhatOracleMock = await Mock.deploy();
       const weights = [100, 50, 200, 60];
       const signers = [addr1, addr2, addr3, addr4]
@@ -328,7 +326,7 @@ describe("JureIVOracle.sol", function () {
 
     it("MedianPrice in the middle, totalSum % 2 == 0, should return average of middle prices", async function () {
       const { owner, addr1, addr2, addr3, addr4 } = await loadFixture(deployOracleFixture);
-      const Mock = await ethers.getContractFactory("JureIVOracleMock");
+      const Mock = await ethers.getContractFactory("SimpleOracleMock");
       const hardhatOracleMock = await Mock.deploy();
       const weights = [10, 10, 10, 10];
       const signers = [addr1, addr2, addr3, addr4]
@@ -363,7 +361,7 @@ describe("JureIVOracle.sol", function () {
 
     it("MedianPrice 1 vote", async function () {
       const { owner, addr1 } = await loadFixture(deployOracleFixture);
-      const Mock = await ethers.getContractFactory("JureIVOracleMock");
+      const Mock = await ethers.getContractFactory("SimpleOracleMock");
       const hardhatOracleMock = await Mock.deploy();
       const weight = 10;
       await hardhatOracleMock.connect(owner).addOrUpdate(addr1.address, weight);
@@ -386,7 +384,7 @@ describe("JureIVOracle.sol", function () {
 
     it("MedianPrice 0 votes", async function () {
       const { owner, addr1 } = await loadFixture(deployOracleFixture);
-      const Mock = await ethers.getContractFactory("JureIVOracleMock");
+      const Mock = await ethers.getContractFactory("SimpleOracleMock");
       const hardhatOracleMock = await Mock.deploy();
       const weight = 10;
       await hardhatOracleMock.connect(owner).startRound(30, 40);
